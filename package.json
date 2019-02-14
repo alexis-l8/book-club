@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "mdx-deck chapter9.mdx"
+    "start": "mdx-deck chapter10.mdx"
   },
   "keywords": [],
   "author": "",
