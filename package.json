@@ -4,12 +4,15 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "mdx-deck chapter10.mdx"
+    "start:oracles": "mdx-deck ./src/11-Oracles.mdx",
+    "start:solidity": "mdx-deck ./src/solidity.mdx"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "mdx-deck": "^1.8.2"
+    "mdx-deck": "^1.8.2",
+    "mdx-deck-code-surfer": "^0.5.5",
+    "raw-loader": "^1.0.0"
   }
 }
