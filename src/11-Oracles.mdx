@@ -15,8 +15,219 @@ export default Splash
 
 # **Oracles**
 
-**Chapter 11**  
+**CHAPTER 11**  
 **MASTERING ETHEREUM**  
+
+
 
 *21 Jan 2019*
 ---
+
+Oracles bridge the gap between the digital _***smart contract/on-chain***_ world and the _***real/off-chain***_ world
+---
+
+# Example Weather Smart Contract
+
+1. If it is sunny tomorrow, you win 1 ether.
+2. But if it is rainy tomorrow, you lose 1 ether.
+
+So how do we let the smart contract know it if rains or shines?
+---
+
+You guessed it, Oracles 🤓
+---
+
+In Greek mythology, an Oracle is a person in communication with the gods who can see visions of the future.
+---
+
+### Why are Oracles needed?
+---
+
+The Ethereum Virtual Machine executes programs and updates the state of Ethereum.  
+EVM execution is totally deterministic, based only on the shared Ethereum state and signed transactions.
+---
+
+This introduces 2 problems:  
+
+1. There can be no intrinsic source of randomness --> otherwise no network consensus on what the state should be  
+2. Extrinsic data can only be introduced as the data payload of a transaction -->  signed transactions (extrinsic information) may not be trustworthy  
+
+Oracles solves these problems...
+---
+
+### Oracle use cases and examples
+
+- Triggers relating to natural hazards e.g. Richter scale measurements for an earthquake bond
+- Political events: for prediction market resolution
+- Sporting events: for prediction market resolution and fantasy sports contracts
+- Damage verification: for insurance contracts
+- Events occurring on other blockchains: interoperability functions
+- Etc...
+---
+
+## Oracles are ideally trustless
+---
+
+However, some oracles provide data from a private source e.g. academic certificates, government IDs.  
+
+In these cases:
+- The source of the data is fully trusted e.g. university, governement department
+- But the truth of the data is subjective e.g. did I really finish university or actually just bribe them  
+
+Such data cannot be provided trustlessly, yet we still consider them Oracles since they provide a data bridge for smart contracts.
+---
+
+## Oracle Key Functions
+
+1. Collect data from an off-chain source.
+2. Transfer the data on-chain with a signed message.
+3. Make the data available by putting it in a smart contract’s storage.
+
+Once the data is available in a smart contract’s storage, it can be accessed by other smart contracts, Ethereum nodes or network-enabled clients.
+---
+
+## Oracle Design Patterns  
+3 main ways to set up an Oracle
+
+1. Immediate-Read
+2. Publish-Subscribe
+3. Request–Response
+---
+
+## Immediate-Read Oracle
+
+- These provide data when it is needed on a "just-in-time" basis.
+- The oracle stores the data in its contract storage, so other smart contracts can get it with a request call.
+- The data is also available for direct lookup. (no gas costs or issuing a transaction)
+---
+
+## Immediate-Read Oracle
+
+- This type of oracle is attractive to an organization or company that might otherwise have to run and maintain servers to answer such data requests.
+- Note that the data stored by the oracle is likely not to be the raw data that the oracle is serving, e.g., for efficiency or privacy reasons.
+- Hashes of the raw data might be stored instead. E.g. private identification data --> hash
+
+Example: A shop wanting to check the age of a customer wishing to purchase alcohol could use an oracle in this way.
+---
+
+## Publish–Subscribe
+
+- The Oracle provides a broadcast service for data that is expected to change. (Similar to RSS Feed)
+- When updated with new information, a flag signals that new data is available to those who consider themselves "subscribed".
+- Interested parties either poll the oracle to check whether the latest information has changed, or listen for updates to oracle contracts and act when they occur.
+---
+
+## Publish–Subscribe
+
+- Polling is very inefficient in the world of web servers, but not so with Ethereum.
+- Ethereum clients have to keep up with all state changes, including changes to contract storage, so polling for data changes is a local call to a synced client.
+- However, if the polling is done from a smart contract, then significant gas expenditure may be incurred.
+---
+
+## Request-Response
+
+- The pattern is used when the amount of data is too large to be stored in a smart contract and users are expected to only need a small part of the overall dataset at a time. e.g. Bloomberg
+- In practical terms, such an oracle might be implemented as a system of on-chain smart contracts and off-chain infrastructure used to monitor requests and retrieve and return data.
+- The request and response could be made to and from an Internet of Things–enabled hardware sensor.
+- Therefore, oracles can be human, software, or hardware.
+---
+
+## Request-Response Steps
+
+1. Receive a query from a DApp.
+2. Parse the query.
+3. Check that payment and data access permissions are provided.
+4. Retrieve relevant data from an off-chain source (and encrypt it if necessary).
+5. Sign the transaction(s) with the data included.
+6. Broadcast the transaction(s) to the network.
+7. Schedule any further necessary transactions, such as notifications, etc.
+---
+
+## Data Authentication
+
+- Data may be tampered with in transit.
+- It is critical that off-chain methods are able to attest to the returned data’s integrity.
+
+Two common approaches to data authentication:  
+
+1. Authenticity proofs  
+2. Trusted execution environments (TEEs)
+---
+
+## Authenticity Proofs
+
+- These are cryptographic guarantees that data has not been tampered with.
+- By verifying the authenticity proof on-chain, smart contracts are able to verify the integrity of the data before operating upon it.
+---
+
+## Trusted Execution Environments
+
+- A TEE is a secure area inside a main processor.
+- It runs in parallel of the operating system, in an isolated environment.
+- It guarantees that the code and data loaded in the TEE are protected with respect to confidentiality and integrity.
+---
+
+## Computation Oracles
+
+- Ethereum has a block gas limit and expensive computation costs.
+- Computation oracles can be used to perform computation on a set of inputs and return a calculated result that may have been infeasible to calculate on-chain.
+
+Examples:
+
+1. Oraclize - centralized but auditable service
+2. TrueBit - more decentralized solution
+---
+
+Centralized data or computation oracles suffice for many applications, but they represent single points of failure in the Ethereum network.
+---
+
+## Decentralized Oracles
+*Example: ChainLink*
+
+A decentralized oracle network consisting of:
+- 3 key smart contracts (a reputation contract, an order-matching contract, and an aggregation contract)
+- An off-chain registry of data providers.
+---
+
+## ChainLink
+
+- Reputation Contract: keep track of data providers' performance
+- Order-Matching Contract: selects bids from oracles using the reputation contract
+- Aggregation Contract: collects responses from multiple oracles and calculates the final collective result
+---
+
+## ChainLink Problems*
+
+- ChainLink proposes calculating a weighted response, allowing a validity score to be reported for each oracle response.
+- It relies on the premise that outlying data points, measured by deviations from responses provided by peers, are incorrect.
+- This risks penalizing correct answers over average ones.
+
+*ChainLink offers a standard set of aggregation contracts, but also allows customized aggregation contracts to be specified.
+---
+export default SideTitle
+
+### Words of Week
+
+### Schelling Point  
+
+- In game theory, a focal point (also called Schelling point) is a solution that people will tend to use in the absence of communication, because it seems natural, special, or relevant to them.
+- Introduced by the Nobel Memorial Prize-winning American economist Thomas Schelling.
+
+From his book *The Strategy of Conflict* :  
+"...focal point for each person's expectation of what the other expects him to expect to be expected to do".
+---
+
+## SchellingCoin protocol
+- Multiple participants report values and the median is taken as the “correct” answer.
+- Reporters are required to provide a deposit that is redistributed in favor of values that are closer to the median.
+- This incentivizes the reporting of values that are similar to others.
+- The Schelling point is expected to be close to the actual value.
+---
+
+## Conclusion
+
+- Oracles provide a crucial service to smart contracts, bringing external facts to contract execution.
+- When considering the use of an oracle be very careful about the trust model.
+---
+
+"Choose carefully and you can start exploring the bridge between Ethereum and the "real world" that oracles offer."
